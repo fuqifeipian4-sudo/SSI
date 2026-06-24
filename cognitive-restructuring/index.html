@@ -170,17 +170,17 @@
                     <div class="bucket-container">
                         <div class="bucket-label">Supports</div>
                         <div class="bucket-dropzone" id="dropzone-supports" data-bucket="supports">
-                            <img src="support-bucket-base.png" class="bucket-base" alt="Bucket Base">
+                            <img src="/images/support-bucket-base.png" class="bucket-base" alt="Bucket Base">
                             <div class="bucket-items"></div>
-                            <img src="support-bucket-overlay.png" class="bucket-overlay" alt="Bucket Front">
+                            <img src="/images/support-bucket-overlay.png" class="bucket-overlay" alt="Bucket Front">
                         </div>
                     </div>
                     <div class="bucket-container">
                         <div class="bucket-label">Opposes</div>
                         <div class="bucket-dropzone" id="dropzone-opposes" data-bucket="opposes">
-                            <img src="oppose-bucket-base.png" class="bucket-base" alt="Bucket Base">
+                            <img src="/images/oppose-bucket-base.png" class="bucket-base" alt="Bucket Base">
                             <div class="bucket-items"></div>
-                            <img src="oppose-bucket-overlay.png" class="bucket-overlay" alt="Bucket Front">
+                            <img src="/images/oppose-bucket-overlay.png" class="bucket-overlay" alt="Bucket Front">
                         </div>
                     </div>
                 </div>
@@ -419,15 +419,21 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const SURVEY_ID = "ssi_cognitive_restructuring";
 
-        function getOrCreateParticipantId() {
-            let participantId = localStorage.getItem("participant_id");
-            if (!participantId) {
-                participantId = crypto.randomUUID();
-                localStorage.setItem("participant_id", participantId);
-            }
-            return participantId;
+        function isValidUUID(value) {
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
         }
 
+        function getOrCreateParticipantId() {
+            let participantId = localStorage.getItem("participant_id");
+
+            if (!participantId || !isValidUUID(participantId)) {
+            participantId = crypto.randomUUID();
+            localStorage.setItem("participant_id", participantId);
+        }
+
+            return participantId;
+        }   
+        
         const participantId = getOrCreateParticipantId();
         const sessionId = crypto.randomUUID();
         const surveyStartedAt = new Date().toISOString();
@@ -435,6 +441,79 @@
         let activeScreenStartedAt = Date.now();
         const screenTimesMs = {};
         let thoughtSupportedAnswer = null;
+
+        // --- Event Analytics ---
+        // These events are stored in public.survey_events.
+        // They are for funnel/dropoff/timing analytics, not raw FRQ storage.
+        async function logSurveyEvent(eventName, data = {}) {
+            const payload = {
+                survey_id: SURVEY_ID,
+                participant_id: participantId,
+                session_id: sessionId,
+
+                event_name: eventName,
+                screen_id: data.screen_id || activeScreenId || null,
+                next_screen_id: data.next_screen_id || null,
+                question_id: data.question_id || null,
+
+                time_spent_ms: typeof data.time_spent_ms === "number" ? data.time_spent_ms : null,
+                branch: data.branch || currentBranch || null,
+
+                event_data: {
+                    ...data,
+                    page_url: window.location.href,
+                    referrer: document.referrer || null,
+                    client_time: new Date().toISOString()
+                }
+            };
+
+            const { error } = await supabaseClient
+                .from("survey_events")
+                .insert(payload);
+
+            if (error) {
+                console.warn("Survey event failed:", error);
+            }
+        }
+
+        function logSurveyEventKeepalive(eventName, data = {}) {
+            const payload = {
+                survey_id: SURVEY_ID,
+                participant_id: participantId,
+                session_id: sessionId,
+
+                event_name: eventName,
+                screen_id: data.screen_id || activeScreenId || null,
+                next_screen_id: data.next_screen_id || null,
+                question_id: data.question_id || null,
+
+                time_spent_ms: typeof data.time_spent_ms === "number" ? data.time_spent_ms : null,
+                branch: data.branch || currentBranch || null,
+
+                event_data: {
+                    ...data,
+                    page_url: window.location.href,
+                    referrer: document.referrer || null,
+                    client_time: new Date().toISOString()
+                }
+            };
+
+            try {
+                fetch(`${SUPABASE_URL}/rest/v1/survey_events`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "apikey": SUPABASE_ANON_KEY,
+                        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                        "Prefer": "return=minimal"
+                    },
+                    body: JSON.stringify(payload),
+                    keepalive: true
+                });
+            } catch (error) {
+                console.warn("Keepalive survey event failed:", error);
+            }
+        }
 
         function recordCurrentScreenTime() {
             const now = Date.now();
@@ -444,12 +523,53 @@
             activeScreenStartedAt = now;
         }
 
-        window.openModal = () => document.getElementById('feelings-modal').classList.add('active');
-        window.closeModal = () => document.getElementById('feelings-modal').classList.remove('active');
+        logSurveyEvent("survey_started", {
+            screen_id: "screen-intro-1",
+            started_at: surveyStartedAt
+        });
+
+        logSurveyEvent("screen_viewed", {
+            screen_id: "screen-intro-1",
+            previous_screen_id: null
+        });
+
+        window.openModal = () => {
+            document.getElementById('feelings-modal').classList.add('active');
+            logSurveyEvent("feelings_modal_opened", {
+                screen_id: activeScreenId
+            });
+        };
+
+        window.closeModal = () => {
+            document.getElementById('feelings-modal').classList.remove('active');
+            logSurveyEvent("feelings_modal_closed", {
+                screen_id: activeScreenId
+            });
+        };
 
         window.nextScreen = function(screenId) {
-            recordCurrentScreenTime();
+            const previousScreenId = activeScreenId;
+            const now = Date.now();
+            const timeSpent = now - activeScreenStartedAt;
+
+            if (previousScreenId) {
+                screenTimesMs[previousScreenId] =
+                    (screenTimesMs[previousScreenId] || 0) + timeSpent;
+
+                logSurveyEvent("screen_exited", {
+                    screen_id: previousScreenId,
+                    next_screen_id: screenId,
+                    time_spent_ms: timeSpent
+                });
+            }
+
             activeScreenId = screenId;
+            activeScreenStartedAt = now;
+
+            logSurveyEvent("screen_viewed", {
+                screen_id: screenId,
+                previous_screen_id: previousScreenId
+            });
 
             const currentScreen = document.querySelector('.screen.active');
             const targetScreen = document.getElementById(screenId);
@@ -470,13 +590,33 @@
             const value = document.getElementById(id).value.trim();
             if (value === '') {
                 alert("Please type an answer before continuing.");
+                logSurveyEvent("validation_failed", {
+                    screen_id: activeScreenId,
+                    question_id: id,
+                    reason: "empty_required_text"
+                });
                 return;
             }
+
+            // Log answer metadata for dropout/funnel analysis.
+            // Full raw FRQ text is still saved only on final survey submission.
+            logSurveyEvent("frq_answered", {
+                screen_id: activeScreenId,
+                question_id: id,
+                answer_length: value.length
+            });
+
             nextScreen(nextId);
         };
 
         window.selectBranch = function(branch) {
             currentBranch = branch;
+
+            logSurveyEvent("branch_selected", {
+                screen_id: "screen-branch",
+                branch: branch
+            });
+
             const data = activityData[branch];
             document.getElementById('context-text-1').innerHTML = data.quoteText1;
             document.getElementById('context-text-2').innerHTML = data.quoteText2;
@@ -495,7 +635,15 @@
             pool.innerHTML = '';
             dropzones.forEach(zone => { zone.querySelector('.bucket-items').innerHTML = ''; zone.classList.remove('drag-over'); });
 
-            [...fishData].sort(() => Math.random() - 0.5).forEach(item => {
+            const randomizedFishData = [...fishData].sort(() => Math.random() - 0.5);
+
+            logSurveyEvent("practice_game_initialized", {
+                screen_id: "screen-game",
+                branch: currentBranch,
+                randomized_fish_order: randomizedFishData.map(item => item.id)
+            });
+
+            randomizedFishData.forEach(item => {
                 const fish = document.createElement('div');
                 fish.className = 'fish'; fish.id = item.id; fish.setAttribute('draggable', 'true');
                 fish.dataset.type = item.type; fish.innerText = item.text;
@@ -513,13 +661,43 @@
                 zone.addEventListener('dragover', e => e.preventDefault());
                 zone.addEventListener('dragenter', function(e) { e.preventDefault(); this.classList.add('drag-over'); });
                 zone.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
-                zone.addEventListener('drop', function(e) { e.preventDefault(); this.classList.remove('drag-over'); if (draggedElement) this.querySelector('.bucket-items').appendChild(draggedElement); });
+                zone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('drag-over');
+
+                    if (draggedElement) {
+                        this.querySelector('.bucket-items').appendChild(draggedElement);
+
+                        logSurveyEvent("fish_dropped", {
+                            screen_id: "screen-game",
+                            fish_id: draggedElement.id,
+                            correct_bucket: draggedElement.dataset.type,
+                            selected_bucket: this.dataset.bucket,
+                            is_correct: draggedElement.dataset.type === this.dataset.bucket,
+                            input_method: "mouse"
+                        });
+                    }
+                });
             });
 
             pool.addEventListener('dragover', e => e.preventDefault());
             pool.addEventListener('dragenter', function(e) { e.preventDefault(); this.classList.add('drag-over'); });
             pool.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
-            pool.addEventListener('drop', function(e) { e.preventDefault(); this.classList.remove('drag-over'); if (draggedElement) this.appendChild(draggedElement); });
+            pool.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+
+                if (draggedElement) {
+                    this.appendChild(draggedElement);
+
+                    logSurveyEvent("fish_returned_to_pool", {
+                        screen_id: "screen-game",
+                        fish_id: draggedElement.id,
+                        correct_bucket: draggedElement.dataset.type,
+                        input_method: "mouse"
+                    });
+                }
+            });
         }
 
         function handleTouchStart(e) {
@@ -544,27 +722,98 @@
         const updateTouchPosition = (x, y) => { draggedElement.style.left = (x - touchOffsetX) + 'px'; draggedElement.style.top = (y - touchOffsetY) + 'px'; };
 
         function handleTouchEnd(e) {
-            if (!draggedElement) return; draggedElement.classList.remove('dragged');
-            Object.assign(draggedElement.style, { position: '', zIndex: '', left: '', top: '', width: '', height: '', pointerEvents: '' });
+            if (!draggedElement) return;
+
+            const droppedFish = draggedElement;
+            droppedFish.classList.remove('dragged');
+
+            Object.assign(droppedFish.style, { position: '', zIndex: '', left: '', top: '', width: '', height: '', pointerEvents: '' });
+
             const touch = e.changedTouches[0], el = document.elementFromPoint(touch.clientX, touch.clientY);
             document.querySelectorAll('.bucket-dropzone, #fish-pool').forEach(z => z.classList.remove('drag-over'));
+
             const zone = el ? (el.closest('.bucket-dropzone') || el.closest('#fish-pool')) : null;
-            if (zone) (zone.querySelector('.bucket-items') || zone).appendChild(draggedElement);
-            else originalParent.appendChild(draggedElement);
+
+            if (zone) {
+                (zone.querySelector('.bucket-items') || zone).appendChild(droppedFish);
+
+                if (zone.classList.contains('bucket-dropzone')) {
+                    logSurveyEvent("fish_dropped", {
+                        screen_id: "screen-game",
+                        fish_id: droppedFish.id,
+                        correct_bucket: droppedFish.dataset.type,
+                        selected_bucket: zone.dataset.bucket,
+                        is_correct: droppedFish.dataset.type === zone.dataset.bucket,
+                        input_method: "touch"
+                    });
+                } else {
+                    logSurveyEvent("fish_returned_to_pool", {
+                        screen_id: "screen-game",
+                        fish_id: droppedFish.id,
+                        correct_bucket: droppedFish.dataset.type,
+                        input_method: "touch"
+                    });
+                }
+            } else {
+                originalParent.appendChild(droppedFish);
+                logSurveyEvent("fish_drop_cancelled", {
+                    screen_id: "screen-game",
+                    fish_id: droppedFish.id,
+                    correct_bucket: droppedFish.dataset.type,
+                    input_method: "touch"
+                });
+            }
+
             draggedElement = null;
         }
 
         window.evaluateSorting = function() {
             if (document.getElementById('fish-pool').querySelectorAll('.fish').length > 0) {
-                alert("Please drop all evidence fish into the buckets before submitting!"); return;
+                alert("Please drop all evidence fish into the buckets before submitting!");
+                logSurveyEvent("practice_sorting_validation_failed", {
+                    screen_id: "screen-game",
+                    reason: "fish_left_in_pool",
+                    remaining_fish_count: document.getElementById('fish-pool').querySelectorAll('.fish').length
+                });
+                return;
             }
+
             let wrong = false;
-            document.querySelectorAll('.bucket-dropzone').forEach(z => z.querySelectorAll('.fish').forEach(f => { if(f.dataset.type !== z.dataset.bucket) wrong = true; }));
+            const sortingAnswers = getPracticeSortingAnswers();
+
+            document.querySelectorAll('.bucket-dropzone').forEach(z => z.querySelectorAll('.fish').forEach(f => {
+                if (f.dataset.type !== z.dataset.bucket) wrong = true;
+            }));
+
+            logSurveyEvent("practice_sorting_submitted", {
+                screen_id: "screen-game",
+                branch: currentBranch,
+                all_correct: !wrong,
+                sorting_answers: sortingAnswers
+            });
+
             nextScreen(wrong ? 'screen-review' : 'screen-reframe');
         };
 
         window.preparePersonalGame = function() {
-            if (document.getElementById('input-q5').value.trim() === '') { alert("Please type an answer before continuing."); return; }
+            const feelingValue = document.getElementById('input-q5').value.trim();
+
+            if (feelingValue === '') {
+                alert("Please type an answer before continuing.");
+                logSurveyEvent("validation_failed", {
+                    screen_id: "screen-q5",
+                    question_id: "input-q5",
+                    reason: "empty_required_text"
+                });
+                return;
+            }
+
+            logSurveyEvent("frq_answered", {
+                screen_id: "screen-q5",
+                question_id: "input-q5",
+                answer_length: feelingValue.length
+            });
+
             const thought = document.getElementById('input-q4').value;
             document.getElementById('display-thought-1').innerText = thought;
             document.getElementById('display-thought-2').innerText = thought;
@@ -575,8 +824,26 @@
             const inputEl = document.getElementById(type === 'support' ? 'input-support-fish' : 'input-oppose-fish');
             const poolEl = document.getElementById(type === 'support' ? 'pool-support-fish' : 'pool-oppose-fish');
             const arr = type === 'support' ? personalSupportFishes : personalOpposeFishes;
-            if (arr.length >= 5) { alert('You can only add up to 5 fish!'); return; }
-            const text = inputEl.value.trim(); if (!text) return;
+
+            if (arr.length >= 5) {
+                alert('You can only add up to 5 fish!');
+                logSurveyEvent("evidence_add_failed", {
+                    screen_id: activeScreenId,
+                    evidence_type: type,
+                    reason: "max_5_reached"
+                });
+                return;
+            }
+
+            const text = inputEl.value.trim();
+            if (!text) {
+                logSurveyEvent("evidence_add_failed", {
+                    screen_id: activeScreenId,
+                    evidence_type: type,
+                    reason: "empty_text"
+                });
+                return;
+            }
 
             const obj = { text: text, asset: `/images/fish${Math.floor(Math.random() * 4) + 1}.png` };
             arr.push(obj);
@@ -584,17 +851,33 @@
             fishEl.className = 'fish'; fishEl.innerText = text; fishEl.style.backgroundImage = `url('${obj.asset}')`;
             poolEl.appendChild(fishEl);
             inputEl.value = '';
+
+            // Log metadata only. The actual text is saved in final survey_responses.
+            logSurveyEvent("personal_evidence_added", {
+                screen_id: activeScreenId,
+                evidence_type: type,
+                evidence_length: text.length,
+                evidence_count_for_type: arr.length
+            });
         };
 
         window.calculatePersonalResults = function() {
             const supCount = personalSupportFishes.length, oppCount = personalOpposeFishes.length;
-            if (supCount === 0 && oppCount === 0) { alert("Please add at least one piece of evidence before reviewing."); return; }
+
+            if (supCount === 0 && oppCount === 0) {
+                alert("Please add at least one piece of evidence before reviewing.");
+                logSurveyEvent("personal_results_validation_failed", {
+                    screen_id: "screen-q7",
+                    reason: "no_evidence_added"
+                });
+                return;
+            }
 
             const headline = document.getElementById('results-headline');
             const btnContainer = document.getElementById('results-btn-container');
             const supPool = document.getElementById('display-supports-pool');
             const oppPool = document.getElementById('display-opposes-pool');
-            
+
             supPool.innerHTML = ''; oppPool.innerHTML = '';
 
             const appendFish = (fishArray, targetContainer) => {
@@ -608,6 +891,13 @@
 
             appendFish(personalSupportFishes, supPool);
             appendFish(personalOpposeFishes, oppPool);
+
+            logSurveyEvent("personal_results_calculated", {
+                screen_id: "screen-q7",
+                supporting_evidence_count: supCount,
+                opposing_evidence_count: oppCount,
+                result_category: supCount > oppCount ? "more_supporting" : (supCount === oppCount ? "equal" : "more_opposing")
+            });
 
             if (supCount > oppCount) {
                 headline.innerText = "You came up with more evidence supporting the thought than opposing it. Look at the evidence you provided. Does it fully support the thought?";
@@ -625,6 +915,13 @@
 
         window.recordThoughtSupportedAnswer = function(answer) {
             thoughtSupportedAnswer = answer;
+
+            logSurveyEvent("mcq_answered", {
+                screen_id: "screen-personal-results",
+                question_id: "thought_fully_supported_answer",
+                answer: answer
+            });
+
             if (answer === "yes") {
                 nextScreen("screen-supports-yes");
             } else {
@@ -700,6 +997,10 @@
                 metadata: {
                     user_agent: navigator.userAgent,
                     page_url: window.location.href,
+                    referrer: document.referrer || null,
+                    screen_width: window.screen.width,
+                    screen_height: window.screen.height,
+                    language: navigator.language,
                     submitted_client_time: new Date().toISOString()
                 }
             };
@@ -710,14 +1011,40 @@
 
             if (error) {
                 console.error("Supabase submission error:", error);
+
+                await logSurveyEvent("survey_submit_failed", {
+                    screen_id: "screen-email",
+                    error_message: error.message || "Unknown Supabase insert error"
+                });
+
                 alert("There was an error submitting your responses. Please try again.");
                 btn.disabled = false;
                 btn.innerText = "Submit & Finish";
                 return;
             }
 
+            await logSurveyEvent("survey_completed", {
+                screen_id: "screen-email",
+                total_time_ms: Object.values(screenTimesMs).reduce((sum, value) => sum + value, 0)
+            });
+
             nextScreen("screen-thank-you");
         };
+
+        window.addEventListener("beforeunload", function() {
+            const now = Date.now();
+            const timeSpent = now - activeScreenStartedAt;
+
+            if (activeScreenId) {
+                screenTimesMs[activeScreenId] = (screenTimesMs[activeScreenId] || 0) + timeSpent;
+            }
+
+            logSurveyEventKeepalive("page_unloaded", {
+                screen_id: activeScreenId,
+                time_spent_ms: timeSpent,
+                total_time_ms_so_far: Object.values(screenTimesMs).reduce((sum, value) => sum + value, 0)
+            });
+        });
 
     </script>
 </body>
