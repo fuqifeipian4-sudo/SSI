@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSI Home</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        .site-header {
+            background-color: #ffffff;
+            padding: 30px 50px; /* Enhanced vertical padding to match mock-up spacing */
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Updated to style the image asset accurately */
+        .logo-img {
+            height: 34px; /* Scaled to perfectly match the layout proportions */
+            width: auto;
+            display: block;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            background-color: #79C2CE; /* Matched teal background */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 40px;
+            position: relative;
+        }
+
+        /* Navigation Buttons Row */
+        .button-nav {
+            display: flex;
+            justify-content: center;
+            gap: 45px;
+            width: 100%;
+            max-width: 1300px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            background-color: #3182B1; /* Matched button blue */
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.4rem;
+            font-weight: 600;
+            padding: 18px 38px;
+            border-radius: 100px; /* Fully rounded capsule shape */
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        /* Hover effect for better UX */
+        .btn:hover {
+            background-color: #266b94;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Center Placeholder Message */
+        .message-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 100px; /* Slightly offsets it upward like the screenshot */
+        }
+
+        .placeholder-text {
+            color: #ffffff;
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            opacity: 0.95;
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .site-header {
+                padding: 20px;
+                justify-content: center;
+            }
+            .logo-img {
+                height: 28px; /* Slightly smaller for mobile viewports */
+            }
+            .button-nav {
+                gap: 20px;
+            }
+            .btn {
+                font-size: 1.1rem;
+                padding: 14px 28px;
+                width: 100%;
+                max-width: 340px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="logo-container">
+            <img src="images/Columbia_University_Logo-black.png" alt="Columbia University Logo" class="logo-img">
+        </div>
+    </header>
+
+    <main class="main-content">
+        
+        <nav class="button-nav">
+            <a href="#" class="btn">Cognitive Restructuring</a>
+            <a href="#" class="btn">IPT</a>
+            <a href="#" class="btn">Values</a>
+            <a href="#" class="btn">Long-term Goals</a>
+        </nav>
+
+        <div class="message-container">
+            <p class="placeholder-text">this page will look better soon</p>
+        </div>
+
+    </main>
+
+</body>
+</html>
