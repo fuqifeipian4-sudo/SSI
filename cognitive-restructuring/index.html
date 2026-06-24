@@ -8,7 +8,7 @@
 
         @font-face {
             font-family: 'CS Matches Drawn';
-            src: url('fonts/Csmatchesdrawn.otf') format('opentype');
+            src: url('/fonts/Csmatchesdrawn.otf') format('opentype');
             font-weight: normal;
             font-style: normal;
         }
@@ -578,7 +578,7 @@
             if (arr.length >= 5) { alert('You can only add up to 5 fish!'); return; }
             const text = inputEl.value.trim(); if (!text) return;
 
-            const obj = { text: text, asset: `fish${Math.floor(Math.random() * 4) + 1}.png` };
+            const obj = { text: text, asset: `/images/fish${Math.floor(Math.random() * 4) + 1}.png` };
             arr.push(obj);
             const fishEl = document.createElement('div');
             fishEl.className = 'fish'; fishEl.innerText = text; fishEl.style.backgroundImage = `url('${obj.asset}')`;
