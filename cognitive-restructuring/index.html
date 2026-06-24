@@ -30,7 +30,7 @@
         h2, h3, .bucket-label { font-weight: normal; }
         strong, b, u { font-weight: 700; }
         body {
-            background: url('images/sea-background.jpg') repeat-x center 0% / auto 250% fixed;
+            background: url('/images/sea-background.jpg') repeat-x center 0% / auto 250% fixed;
             min-height: 100vh;
             color: var(--deep-blue);
             display: flex;
@@ -122,7 +122,7 @@
 
     <div class="container">
         <div class="header-logo-container">
-            <img src="images/Columbia_University_Logo-white.png" alt="Columbia University Logo" class="univ-logo">
+            <img src="/images/Columbia_University_Logo-white.png" alt="Columbia University Logo" class="univ-logo">
         </div>
         
         <div id="screen-intro-1" class="screen active">
@@ -343,7 +343,7 @@
             <span class="modal-close" onclick="closeModal()">&times;</span>
             <h3 style="color: var(--deep-blue); font-size: 1.4rem; margin-bottom: 5px;">Need help labeling how you feel?</h3>
             <p style="font-size: 1rem; color: #555;">Use this wheel to help pinpoint exactly what you are experiencing.</p>
-            <img src="images/feelings-wheel.png" alt="Feelings Wheel Diagram" class="modal-img">
+            <img src="/images/feelings-wheel.png" alt="Feelings Wheel Diagram" class="modal-img">
             <div class="btn-container" style="margin-top: 15px;"><button onclick="closeModal()" style="padding: 10px 30px; font-size: 1rem;">Close Window</button></div>
         </div>
     </div>
@@ -370,10 +370,10 @@
                     <p class="conclusion-text">Reframing your thoughts like this can make you feel better!</p>
                 `,
                 fish: [
-                    { id: "s1", text: "They are slow at replying to everyone", type: "opposes", asset: "fish1.png" },
-                    { id: "s2", text: "They often ask me to hangout", type: "opposes", asset: "images/fish2.png" },
-                    { id: "s3", text: "They're at soccer practice right now", type: "opposes", asset: "images/fish3.png" },
-                    { id: "s4", text: "They sometimes ignore me when I text them", type: "supports", asset: "images/fish4.png" }
+                    { id: "s1", text: "They are slow at replying to everyone", type: "opposes", asset: "/images/fish1.png" },
+                    { id: "s2", text: "They often ask me to hangout", type: "opposes", asset: "/images/fish2.png" },
+                    { id: "s3", text: "They're at soccer practice right now", type: "opposes", asset: "/images/fish3.png" },
+                    { id: "s4", text: "They sometimes ignore me when I text them", type: "supports", asset: "/images/fish4.png" }
                 ]
             },
             academics: {
@@ -394,10 +394,10 @@
                     <p class="conclusion-text">Reframing your thoughts like this can make you feel better!</p>
                 `,
                 fish: [
-                    { id: "a1", text: "You've passed hard classes before", type: "opposes", asset: "images/fish1.png" },
-                    { id: "a2", text: "You can study differently in the future to remember the material better", type: "opposes", asset: "images/fish2.png" },
-                    { id: "a3", text: "The first test is worth only 10% of your final grade", type: "opposes", asset: "images/fish3.png" },
-                    { id: "a4", text: "I thought I understood the material and I still did badly", type: "supports", asset: "images/fish4.png" }
+                    { id: "a1", text: "You've passed hard classes before", type: "opposes", asset: "/images/fish1.png" },
+                    { id: "a2", text: "You can study differently in the future to remember the material better", type: "opposes", asset: "/images/fish2.png" },
+                    { id: "a3", text: "The first test is worth only 10% of your final grade", type: "opposes", asset: "/images/fish3.png" },
+                    { id: "a4", text: "I thought I understood the material and I still did badly", type: "supports", asset: "/images/fish4.png" }
                 ]
             }
         };
